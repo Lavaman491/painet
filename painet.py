@@ -130,14 +130,16 @@ class Environment():
     def genSize(self, size=None):
         if size == None:
             return self.GenSize
+        elif len(self.gen) == 0 and type(size) == int:
+            self.GenSize = size
         elif type(size) == int:
             if size == len(self.gen):
                 pass
-            elif size < len(self.gen):
+            elif size > len(self.gen):
                 while not size == len(self.gen):
                     self.gen.append(Brain(self.BaseNetwork))
                 self.readyAI()
-            elif size > len(self.gen):
+            elif size < len(self.gen):
                 while not size == len(self.gen):
                     self.gen.pop(-1)
         else:
@@ -148,13 +150,16 @@ class Environment():
         if network == None:
             return self.deepCopy(self.BaseNetwork)
         elif type(network) == list:
-            self.BaseNetwork = self.deepCopy(network)
-            self.gen = []
-            self.Inputs = network[0]['inputs']
-            self.Outputs = network[1]
-            self.HiddenAF = network[0]['hiddenAF']
-            self.OutputAF = network[0]['outputAF']
-            self.readyAI()
+            try:
+                self.BaseNetwork = self.deepCopy(network)
+                self.gen = []
+                self.Inputs = network[0]['inputs']
+                self.Outputs = network[1]
+                self.HiddenAF = network[0]['hiddenAF']
+                self.OutputAF = network[0]['outputAF']
+                self.readyAI()
+            except:
+                raise "Invalid Input: bad .baseNetwork() argument"
         else:
             raise "Invalid Input: .baseNetwork() argument must be an network list or empty"
     
@@ -244,6 +249,10 @@ class Environment():
                   
                  
     def best(self, arg=None):
+        try:
+            self.gen[0]
+        except IndexError:
+            raise "Variable Error: .best() only works after the environment inputs and outputs are defined"
         if self.gen[0] == None:
             return self.gen[0]
         best = self.gen[0]
