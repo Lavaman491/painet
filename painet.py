@@ -66,7 +66,7 @@ class Environment():
         self.HiddenAF = blankNetwork[0]['hiddenAF']
         self.OutputAF = blankNetwork[0]['outputAF']
         self.BaseNetwork = deepCopy(blankNetwork)
-        self.MutationType = "single"
+        self.MutationType = "multiple"
         self.MutationChance = 0.7
         self.genCount = 0
     
@@ -81,7 +81,7 @@ class Environment():
             self.BaseNetwork[0]['inputs'] = self.Inputs
             for ai in self.gen:
                 ai.Network[0]['inputs'] = self.Inputs
-                self.readyAI()
+                self.setupAI()
         # Error
         else:
             raise "Invalid Input: .inputs() argument must be a list or empty"
@@ -111,17 +111,18 @@ class Environment():
                 for output in ai.Network[-2]:
                     if not output.ID in outputs:
                         del output
-            self.readyAI()
+            self.setupAI()
         else:
             raise "Invalid Input: .outputs() argument must be a list or empty"
     
     
-    def readyAI(self):
+    def setupAI(self):
         if (self.Inputs) and (self.Outputs):   # Empty lists return False
             for i in range(self.GenSize-len(self.gen)):
                 network = self.deepCopy(self.BaseNetwork)
-                self.mutate(network, True)
-                self.gen.append(Brain(network))
+                self.mutate(network, True, self.MutationChance, skipVerification=True)
+                ai = Brain(network)
+                self.gen.append(ai)
             
             
     
@@ -138,7 +139,7 @@ class Environment():
             elif size > len(self.gen):
                 while not size == len(self.gen):
                     self.gen.append(Brain(self.BaseNetwork))
-                self.readyAI()
+                self.setupAI()
             elif size < len(self.gen):
                 while not size == len(self.gen):
                     self.gen.pop(-1)
@@ -157,7 +158,7 @@ class Environment():
                 self.Outputs = network[1]
                 self.HiddenAF = network[0]['hiddenAF']
                 self.OutputAF = network[0]['outputAF']
-                self.readyAI()
+                self.setupAI()
             except:
                 raise "Invalid Input: bad .baseNetwork() argument"
         else:
@@ -168,13 +169,17 @@ class Environment():
         if af == None:
             return self.BaseNetwork[0]['hiddenAF']
         elif type(af) == str:
+            af = af.lower()
             self.HiddenAF = af
             self.BaseNetwork[0]['hiddenAF'] = af
             for ai in self.gen:
-                ai.Network[0]['outputAF'] = af
-                for layer in ai[1:-2]:
-                    for neuron in layer:
-                        neuron.AF = af
+                ai.hiddenAF = af
+                if af in ai.AFs:
+                    for layer in ai.Network[1:-2]:
+                        for neuron in layer:
+                            neuron.af = ai.AFs[af]
+                else:
+                    raise "Input Error: Activation function from .hiddenAF() not found in af list"
         else:
             raise "Invalid Input: .hiddenAF() argument must be a string or empty"
         
@@ -182,13 +187,19 @@ class Environment():
     def outputAF(self, af=None):  
         if af == None:
             return self.BaseNetwork[0]['outputAF']
+        elif len(self.gen) == 0 and type(af) == str:
+            self.OutputAF = af
         elif type(af) == str:
+            af = af.lower()
             self.OutputAF = af
             self.BaseNetwork[0]['outputAF'] = af
             for ai in self.gen:
-                ai.Network[0]['outputAF'] = af
-                for neuron in ai[-2]:
-                    neuron.AF = af
+                ai.outputAF = af
+                if af in ai.AFs:
+                    for neuron in ai.Network[-2]:
+                        neuron.af = ai.AFs[af]
+                else:
+                    raise "Input Error: Activation function from .outputAF() not found in af list"
         else:
             raise "Invalid Input: .outputAF() argument must be a string or empty"
     
@@ -197,7 +208,7 @@ class Environment():
         if arg == None:
             return self.MutationType
         elif type(arg) != str:
-            raise "Invalid Input: .mutationType() argument must be either 'single' or 'multiple'"
+            raise "Input Error: .mutationType() argument must be either 'single' or 'multiple' (string)"
         elif arg.lower() == "single":
             self.MutationType = "single"
         elif arg.lower() == "multiple":
@@ -210,7 +221,7 @@ class Environment():
         if arg == None:
             return self.MutationChance
         elif type(arg) == float:
-            if arg < 0 or arg > 1:
+            if arg <= 0 or arg >= 1:
                 raise "Invalid Input: .mutationChance() argument must be a floating point between 0 and 1.0"
             else:
                 self.MutationChance = arg
@@ -222,6 +233,10 @@ class Environment():
     # Return Output Functions
     #========================
     def status(self):
+        try:
+            deepCopy()
+        except:
+            return "Critical Warning: deepCopy() does not exist"
         if len(self.BaseNetwork[0]['inputs']) == 0:
             return "Warning: Inputs are undefined"
         elif len(self.BaseNetwork[-1]) == 0:
@@ -229,22 +244,26 @@ class Environment():
         elif self.GenSize != len(self.gen):
             return "Module Error: Defined generation size doesn't match generation list length"
         else:
-            return ("""Inputs are Defined;
-                      Outputs are Defined;
+            return ("""Input: %s;
+                      Outputs: %s;
                       Generation Size: %s;
                       Current Generation Iteration: %s;
                       Hidden Layer Activation Function Type: %s;
                       Output Layer Activation Function Type: %s;
                       Mutation Type: %s;
                       Mutation Chance: %s%%;
+                      DeepCopy Exists: True;
                       --Use Environment.baseNetwork() to check the base network--
                     """.replace("  ", "").strip() %(
+                        str(self.Inputs),
+                        str(self.Outputs),
                         str(self.GenSize), 
                         str(self.genCount), 
                         self.BaseNetwork[0]['hiddenAF'], 
                         self.BaseNetwork[0]['outputAF'],
                         self.MutationType,
-                        int(self.MutationChance*100))
+                        str(int(self.MutationChance*100))
+                        )
                   )
                   
                  
@@ -252,7 +271,7 @@ class Environment():
         try:
             self.gen[0]
         except IndexError:
-            raise "Variable Error: .best() only works after the environment inputs and outputs are defined"
+            raise "Setup Error: .best() only works after the environment inputs and outputs are defined"
         if self.gen[0] == None:
             return self.gen[0]
         best = self.gen[0]
@@ -270,6 +289,8 @@ class Environment():
         
     
     def size(self, network):
+        if type(network) != list:
+            raise 
         size = 0
         for layer in network[1:-1]:
             for neuron in layer:
@@ -283,6 +304,10 @@ class Environment():
     # Next Generation
     #=================
     def nextGen(self):
+        # Checks if this is the first gen
+        if self.gen[0].fitness == None:
+            return None
+        self.genCount += 1
         # Sets up best and cutoff
         best = self.best()
         bestNet = self.deepCopy(best.network())
@@ -313,7 +338,9 @@ class Environment():
                 # Adds to fitnesses dictionary
                 fitnesses[ai.fitness] = self.deepCopy(ai.network())
                 totalFitness += ai.fitness
-        
+        # Test if there's any fitnesses
+        if len(fitnesses) == 0:
+            raise "Fitness Error: No fitnesses were found. Assign at least one ai a fitness to create another generation with .nextGen()"
         # Create first AI of previous's best 
         # NOTE: The first ai is untouched to preserve learned networks
         self.gen = []
@@ -321,17 +348,24 @@ class Environment():
         self.gen.append(ai)
         
         # Chooses Parent, Creates AI, and Mutates Network
+        for i in fitnesses.keys():
+            print("Fitness " + str(i) + ": " + str(fitnesses[i]))
+            print("")
         while len(self.gen) < self.GenSize:
             num = self.uniform(0, totalFitness)
             count = 0
             for fitness in fitnesses:
-                count += fitness
+                count += fitness                 # Has an issue with my negative fitnesses
+                #print('A')
+                #print(num)
+                #print(count)
                 if num < count:
+                    #print("B")
                     network = self.deepCopy(fitnesses[fitness])
                     if self.MutationType == "single":
-                        self.mutate(network)
+                        self.mutate(network, skipVerification=True)
                     elif self.MutationType == "multiple":
-                        self.mutate(network, True)
+                        self.mutate(network, True, self.MutationChance, skipVerification=True)
                     self.gen.append(Brain(network))
                     break
 
@@ -339,26 +373,48 @@ class Environment():
 
     # Mutate
     #=======
-    def mutate(self, network, multipleMutations=False):
+    def mutate(self, network, multipleMutations=False, mutationChance=None, skipVerification=False):
         # "And, what do we need to do with them? Say it with me. 3, 2, 1"
         # "We mutate those babies!  ...sorry that's a terrible thing to say" 
         # "But it doesn't mean it's not true." - Code Bullet
+        if skipVerification:
+            pass
+        else:
+            if type(network) != list:
+                raise "Invalid Input: .mutate() first argument must be a list"
+            elif type(multipleMutations) != bool:
+                raise "Invalid Input: .mutate() second argument must be a bool or empty"
+            elif mutationChance != None and type(mutationChance) != float:
+                raise "Invalid Input: .mutate() mutation chance (third argument) must be a float or empty"
+            elif multipleMutations == False and mutationChance != None:
+                raise "Input Error: .mutate() multiple mutations (second argument) must True in order to have a mutationChance (third argument)"
+            elif multipleMutations == True and mutationChance == None:
+                raise "Input Error: .mutate() mutation chance (third argument) must a float between 0 and 1 in order to have multiple mutations (second argument)"
+            elif type(multipleMutations) == float:
+                if mutationChance <= 0 or mutationChance >= 1:
+                    raise "Input Error: .mutate() mutaion chance (third argument) must be between 0 and 1"
+        
         if multipleMutations:
-            msg = self.mutate(network)
+            msg = self.mutate(network, skipVerification=True)
             while msg != "QUIT":
-                msg = self.mutateOnce(network, self.MutationChance)
+                msg = self.mutateOnce(network, mutationChance)
         else:
             self.mutateOnce(network)
   
   
     def mutateOnce(self, network, stoppingChance=None):
         # This function is run by pure magic and stupidity. I'm not sure how I wrote it...
+        if type(network) != list:
+            raise "Invalid Input: .mutateOnce() first argument must be a network list"
+        elif stoppingChance != None and type(stoppingChance) != float:
+            raise "Invalid Input: .mutateOnce() second argument must be a float or empty"
+        if type(stoppingChance) == float: 
+            stoppingChance = 7/stoppingChance  
         message = "!NULL"
         while message[0] == "!":
             message = "!NULL"
             if type(stoppingChance) == float:
-                 # Finds the random max number to create the mutation chance
-                stoppingChance = 7/stoppingChance  
+                # Finds the random max number to create the mutation chance
                 if stoppingChance > 7:
                     mutationNum = self.randint(0,stoppingChance)
                 else:
@@ -486,7 +542,7 @@ class Environment():
 #----------------------------------------------------------------------------------
 
 class Brain():
-    """NOTE: This class can be imported alongside the deppCopy() function and used completely seperate from the rest of the module"""
+    """NOTE: This class can be imported alongside the deepCopy() function and used completely seperate from the rest of the module"""
 
   
     # Neuron Class
@@ -537,6 +593,7 @@ class Brain():
         # Sets Up Network
         self.Network = []
         self.Network.append(self.Inputs)
+        self.functions = {}
         self.AFs = {
             'step':self.step, 
             'linear':self.linear, 
@@ -568,6 +625,9 @@ class Brain():
     # Neural Network Output Functions
     #=================================
     def run(self, inputs):
+        # Check for proper input
+        if type(inputs) != dict:
+            raise "Invalid Input: .run() argument must be a dictionary with inputName:value pairs"
         # Compute Neurons
         memory = {'B': 1}
         for inputVar in self.Network[0]:
@@ -596,7 +656,8 @@ class Brain():
                 )
         network.append(self.deepCopy(self.Network[-1]))
         return network
-        
+    
+    
     
     
     # Activation Functions   
