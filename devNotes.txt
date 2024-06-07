@@ -2,7 +2,8 @@
 CustomAF:
   - Could have a user submit their own function instead of having sigmoid stuff
   - Might be a pain to implement though
-  > AF's could be from dict with a string pairing to the function itself
-  > Custom AF's would just have to be appended to the list and have the function available to the scope in question
+  *> AF's could be from dict with a string pairing to the function itself
+  *> Custom AF's would just have to be appended to the list and have the function available to the scope in question
+  *  It IS like that already, now just the scope issue
 
 test of the branch
