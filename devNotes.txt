@@ -1,0 +1,4 @@
+
+CustomAF:
+  - Could have a user submit their own function instead of having sigmoid stuff
+  - Might be a pain to implement though
